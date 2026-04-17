@@ -1,0 +1,285 @@
+/* ─── Panel ─────────────────────────────────────────────────── */
+.restore-panel {
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ─── Header ────────────────────────────────────────────────── */
+.restore-panel__header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.restore-panel__icon    { font-size: 1.8rem; flex-shrink: 0; }
+.restore-panel__title   { font-size: var(--text-lg); font-weight: 700; }
+.restore-panel__subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+/* ─── Step tracker ──────────────────────────────────────────── */
+.restore-steps {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+}
+.restore-steps__connector {
+  flex: 1;
+  height: 2px;
+  background: var(--color-border);
+}
+
+.restore-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.restore-step__circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xs);
+  font-weight: 800;
+  flex-shrink: 0;
+  border: 2px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text-faint);
+  transition: all var(--transition);
+}
+.restore-step__text {
+  display: flex;
+  flex-direction: column;
+}
+.restore-step__label { font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted); }
+.restore-step__note  { font-size: var(--text-xs); color: var(--color-text-faint); font-style: italic; }
+
+/* Step states */
+.restore-step--active .restore-step__circle {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+.restore-step--active .restore-step__label { color: var(--color-accent); }
+
+.restore-step--done .restore-step__circle {
+  background: #1DB954;
+  border-color: #1DB954;
+  color: #fff;
+}
+.restore-step--done .restore-step__label { color: var(--color-text); }
+
+.restore-step--locked .restore-step__circle { opacity: 0.4; }
+.restore-step--locked .restore-step__label  { opacity: 0.4; }
+
+/* ─── Step body ─────────────────────────────────────────────── */
+.restore-panel__step-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ─── Summary rows ──────────────────────────────────────────── */
+.restore-summary {
+  background: var(--color-surface-2);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.restore-summary--done { border: 1px solid rgba(29,185,84,0.25); }
+
+.restore-summary__row {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+.restore-summary__row--muted  { color: var(--color-text-muted); }
+.restore-summary__row--error  { color: var(--color-error); }
+
+/* ─── Limitations list ──────────────────────────────────────── */
+.restore-panel__limitations {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+.restore-panel__limitations-title {
+  font-weight: 700;
+  margin-bottom: var(--space-2);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+}
+.restore-panel__limitations ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  line-height: 1.5;
+}
+
+/* ─── Progress bar ──────────────────────────────────────────── */
+.restore-panel__creating-label {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.restore-panel__bar {
+  height: 6px;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.restore-panel__bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-accent), #1DB954);
+  border-radius: var(--radius-full);
+  transition: width 400ms ease;
+}
+.restore-panel__bar-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ─── Buttons ───────────────────────────────────────────────── */
+.restore-panel__btn {
+  align-self: flex-start;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  padding: var(--space-3) var(--space-8);
+  border-radius: var(--radius-full);
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition), transform var(--transition);
+}
+.restore-panel__btn:hover { background: var(--color-primary-hover); transform: translateY(-1px); }
+
+.restore-panel__btn--secondary {
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  border: 1.5px solid var(--color-border);
+}
+.restore-panel__btn--secondary:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-surface-2);
+  transform: none;
+}
+
+/* ─── Warnings ──────────────────────────────────────────────── */
+.restore-panel__warnings {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+.restore-panel__warnings summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-orange);
+}
+.restore-panel__warnings ul {
+  list-style: disc;
+  padding-left: var(--space-6);
+  margin-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* ─── Done note ─────────────────────────────────────────────── */
+.restore-panel__done-note {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: 1.7;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
+}
+
+/* ─── Error ─────────────────────────────────────────────────── */
+.restore-panel__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* ─── Mobile ────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .restore-steps { gap: 0; }
+  .restore-step__text { display: none; }  /* just show circles on mobile */
+  .restore-panel__btn { align-self: stretch; text-align: center; }
+}
+
+/* ─── Step heading ───────────────────────────────────────────── */
+.restore-panel__step-heading {
+  font-size: var(--text-base);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.restore-panel__locked-badge {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-text-faint);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 2px var(--space-2);
+}
+
+/* ─── Locked step body ──────────────────────────────────────── */
+.restore-panel__step-body--locked {
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
+}
+
+.restore-panel__locked-note {
+  font-size: var(--text-sm);
+  color: var(--color-text-faint);
+}
+
+/* ─── Sub-progress label ────────────────────────────────────── */
+.restore-panel__progress-sub {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Divider between steps ─────────────────────────────────── */
+.restore-panel__step-body {
+  border-top: 1px solid var(--color-divider);
+  padding-top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}

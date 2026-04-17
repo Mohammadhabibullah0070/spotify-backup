@@ -1,0 +1,244 @@
+/* ─── Skeleton ──────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg,
+    var(--color-surface-2) 25%,
+    var(--color-surface-3) 50%,
+    var(--color-surface-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+.skeleton-text { height: 0.85em; }
+
+/* ─── Container ─────────────────────────────────────────────── */
+.liked-songs {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Collapsed state: no gap needed for single-line */
+.liked-songs--collapsed {
+  gap: var(--space-2);
+}
+
+/* ─── Header ────────────────────────────────────────────────── */
+.liked-songs__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.liked-songs__icon { font-size: 1.2rem; flex-shrink: 0; }
+
+.liked-songs__title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.liked-songs__count-badge {
+  background: rgba(29, 185, 84, 0.12);
+  color: #1DB954;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.liked-songs__loading-text {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.liked-songs__refresh-btn {
+  font-size: var(--text-base);
+  color: var(--color-text-faint);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-1);
+  transition: color var(--transition), transform var(--transition);
+}
+.liked-songs__refresh-btn:hover {
+  color: var(--color-accent);
+  transform: rotate(45deg);
+}
+
+/* Expand / Collapse button */
+.liked-songs__btn {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  transition: border-color var(--transition), color var(--transition);
+  white-space: nowrap;
+}
+.liked-songs__btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.liked-songs__btn--expand { /* same as default */ }
+.liked-songs__btn--collapse { /* same as default */ }
+
+/* ─── Progress bar ──────────────────────────────────────────── */
+.liked-songs__progress-bar {
+  height: 3px;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.liked-songs__progress-fill {
+  height: 100%;
+  background: #1DB954;
+  border-radius: var(--radius-full);
+  transition: width 300ms ease;
+}
+
+/* ─── Summary hint (collapsed) ──────────────────────────────── */
+.liked-songs__summary-hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* ─── Column header ─────────────────────────────────────────── */
+.liked-songs__cols-header {
+  display: grid;
+  grid-template-columns: 32px 1fr 200px 56px;
+  gap: var(--space-3);
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ─── Scrollable rows ───────────────────────────────────────── */
+.liked-songs__rows {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 440px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+.liked-songs__rows::-webkit-scrollbar       { width: 4px; }
+.liked-songs__rows::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 2px; }
+
+/* ─── Individual song row ───────────────────────────────────── */
+.liked-row {
+  display: grid;
+  grid-template-columns: 32px 1fr 200px 56px;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition);
+  cursor: default;
+}
+.liked-row:hover { background: var(--color-surface-2); }
+
+.liked-row--skeleton { pointer-events: none; }
+
+.liked-row__num {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.liked-row__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.liked-row__name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.liked-row__artist {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.liked-row__album {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.liked-row__duration {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ─── Error & empty states ──────────────────────────────────── */
+.liked-songs__error {
+  display: flex; flex-direction: column; align-items: center;
+  gap: var(--space-3); padding: var(--space-8); text-align: center;
+  font-size: var(--text-sm); color: var(--color-text-muted);
+}
+
+.liked-songs__empty {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  padding: var(--space-4) 0;
+}
+
+/* ─── Restore note footer ───────────────────────────────────── */
+.liked-songs__restore-note {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-divider);
+  line-height: 1.6;
+}
+.liked-songs__restore-note code {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  background: var(--color-surface-2);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Mobile ────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .liked-songs__cols-header,
+  .liked-row {
+    grid-template-columns: 28px 1fr 44px;
+  }
+  /* Hide album on mobile */
+  .liked-songs__cols-header > span:nth-child(3),
+  .liked-row__album { display: none; }
+
+  .liked-songs__btn { margin-left: 0; }
+}

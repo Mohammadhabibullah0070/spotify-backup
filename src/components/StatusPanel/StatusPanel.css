@@ -1,0 +1,120 @@
+.status-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* Header row */
+.status-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.status-panel__title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+/* Status badge */
+.status-panel__badge {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+}
+
+.status-panel__badge--idle {
+  background: rgba(255,255,255,0.08);
+  color: var(--color-text-muted);
+}
+
+.status-panel__badge--running {
+  background: var(--color-accent-dim);
+  color: var(--color-accent);
+}
+
+.status-panel__badge--done {
+  background: rgba(29,185,84,0.2);
+  color: #1DB954;
+}
+
+/* Log area */
+.status-panel__log {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  min-height: 120px;
+}
+
+.status-panel__log-empty {
+  font-size: var(--text-sm);
+  color: var(--color-text-faint);
+  font-style: italic;
+}
+
+.status-panel__log-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.status-panel__log-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.status-panel__log-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-faint);
+  flex-shrink: 0;
+}
+
+.status-panel__log-item--info .status-panel__log-dot {
+  background: var(--color-accent);
+}
+
+/* Action buttons */
+.status-panel__actions {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.status-panel__btn {
+  flex: 1;
+  min-width: 120px;
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  transition: background var(--transition), transform var(--transition);
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.status-panel__btn--backup {
+  background: var(--color-accent);
+  color: #000;
+}
+
+.status-panel__btn--restore {
+  background: transparent;
+  border: 2px solid var(--color-accent);
+  color: var(--color-accent);
+}
