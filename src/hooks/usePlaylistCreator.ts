@@ -50,7 +50,7 @@ const DELAY_BETWEEN_CALLS_MS = 300
 
 export function usePlaylistCreator(): UsePlaylistCreatorResult {
   const { destination, getAccessToken } = useAuth()
-  const { importedBackup, setPlaylistMap } = useImportedBackup()
+  const { importedBackup, setPlaylistMap, setStatus: setContextStatus, addLog } = useImportedBackup()
 
   const [status,   setStatus]   = useState<CreatorStatus>('idle')
   const [progress, setProgress] = useState<CreatorProgress | null>(null)
@@ -65,14 +65,21 @@ export function usePlaylistCreator(): UsePlaylistCreatorResult {
   }, [])
 
   const startCreating = useCallback(async () => {
+    addLog('Starting playlist creation...', 'info')
+    setContextStatus('RESTORING')
+
     if (!importedBackup) {
       setError('No backup loaded. Please import a backup file first.')
       setStatus('error')
+      addLog('Error: No backup loaded', 'error')
+      setContextStatus('ERROR')
       return
     }
     if (!destination?.user) {
       setError('No destination account connected.')
       setStatus('error')
+      addLog('Error: No destination account connected', 'error')
+      setContextStatus('ERROR')
       return
     }
 
@@ -80,6 +87,8 @@ export function usePlaylistCreator(): UsePlaylistCreatorResult {
     if (!token) {
       setError('Destination session expired. Please reconnect.')
       setStatus('error')
+      addLog('Error: Destination session expired', 'error')
+      setContextStatus('ERROR')
       return
     }
 
@@ -92,6 +101,7 @@ export function usePlaylistCreator(): UsePlaylistCreatorResult {
     setStatus('creating')
     setError(null)
     setResult(null)
+    addLog(`Creating ${toCreate.length} playlists...`, 'info')
 
     const map:      PlaylistMap = new Map()
     const warnings: string[]   = []
@@ -114,6 +124,7 @@ export function usePlaylistCreator(): UsePlaylistCreatorResult {
         // Store source → destination ID mapping
         map.set(pl.id, created_pl.id)
         created++
+        addLog(`✓ Created playlist "${pl.name}"`, 'success')
 
         if (created_pl.publicOverridden) {
           warnings.push(
@@ -124,6 +135,7 @@ export function usePlaylistCreator(): UsePlaylistCreatorResult {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         failed++
+        addLog(`✗ Failed to create "${pl.name}": ${friendlyError(msg)}`, 'error')
         warnings.push(`Failed to create "${pl.name}": ${friendlyError(msg)}`)
       }
 
@@ -144,10 +156,11 @@ export function usePlaylistCreator(): UsePlaylistCreatorResult {
     // Persist map to BackupContext for Milestone 11
     setPlaylistMap(map)
 
+    addLog(`✓ Playlist creation complete (${created} created, ${failed} failed)`, 'success')
     setResult(finalResult)
     setStatus('done')
     setProgress(null)
-  }, [importedBackup, destination, getAccessToken, setPlaylistMap])
+  }, [importedBackup, destination, getAccessToken, setPlaylistMap, setContextStatus, addLog])
 
   return { status, progress, result, error, startCreating, reset }
 }

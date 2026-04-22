@@ -61,7 +61,7 @@ const DELAY_BETWEEN_MS = 300
 
 export function useLikedSongsRestorer(): UseLikedSongsRestorerResult {
   const { destination, getAccessToken } = useAuth()
-  const { importedBackup }              = useImportedBackup()
+  const { importedBackup, setStatus: setContextStatus, addLog } = useImportedBackup()
 
   const [status,   setStatus]   = useState<LikedRestorerStatus>('idle')
   const [progress, setProgress] = useState<LikedProgress | null>(null)
@@ -76,16 +76,21 @@ export function useLikedSongsRestorer(): UseLikedSongsRestorerResult {
   }, [])
 
   const startRestoring = useCallback(async () => {
+    addLog('Starting liked songs restore...', 'info')
 
     // ── Guard checks ──────────────────────────────────────────
     if (!importedBackup) {
       setError('No backup loaded.')
       setStatus('error')
+      addLog('Error: No backup loaded', 'error')
+      setContextStatus('ERROR')
       return
     }
     if (!destination?.user) {
       setError('No destination account connected.')
       setStatus('error')
+      addLog('Error: No destination account connected', 'error')
+      setContextStatus('ERROR')
       return
     }
 
@@ -93,6 +98,8 @@ export function useLikedSongsRestorer(): UseLikedSongsRestorerResult {
     if (!token) {
       setError('Destination session expired. Please reconnect.')
       setStatus('error')
+      addLog('Error: Session expired', 'error')
+      setContextStatus('ERROR')
       return
     }
 
@@ -116,6 +123,8 @@ export function useLikedSongsRestorer(): UseLikedSongsRestorerResult {
     if (urisToSave.length === 0) {
       setResult({ saved: 0, skippedLocal, skippedEpisode, skippedNull, failed: 0, warnings: [] })
       setStatus('done')
+      addLog('✓ No liked songs to restore', 'info')
+      setContextStatus('COMPLETE')
       return
     }
 
@@ -123,6 +132,7 @@ export function useLikedSongsRestorer(): UseLikedSongsRestorerResult {
     setStatus('restoring')
     setError(null)
     setResult(null)
+    addLog(`Saving ${urisToSave.length} liked songs...`, 'info')
 
     let saved    = 0
     let failed   = 0
@@ -155,6 +165,8 @@ export function useLikedSongsRestorer(): UseLikedSongsRestorerResult {
         if (msg.includes('save_liked_401')) {
           setError('Session expired mid-restore. Please reconnect the destination account.')
           setStatus('error')
+          addLog('Error: Session expired during restore', 'error')
+          setContextStatus('ERROR')
           return
         }
         if (msg.includes('save_liked_403')) {
@@ -164,6 +176,8 @@ export function useLikedSongsRestorer(): UseLikedSongsRestorerResult {
             'on the Spotify permissions screen to grant library access.'
           )
           setStatus('error')
+          addLog('Error: Permission denied', 'error')
+          setContextStatus('ERROR')
           return
         }
 
@@ -187,11 +201,13 @@ export function useLikedSongsRestorer(): UseLikedSongsRestorerResult {
       }
     }
 
+    addLog(`✓ Liked songs restore complete (${saved} saved, ${failed} failed)`, 'success')
     setResult({ saved, skippedLocal, skippedEpisode, skippedNull, failed, warnings })
     setStatus('done')
     setProgress(null)
+    setContextStatus('COMPLETE')
 
-  }, [importedBackup, destination, getAccessToken])
+  }, [importedBackup, destination, getAccessToken, setContextStatus, addLog])
 
   return { status, progress, result, error, startRestoring, reset }
 }

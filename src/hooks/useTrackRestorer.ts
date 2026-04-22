@@ -48,7 +48,7 @@ const DELAY_BETWEEN_MS = 300
 
 export function useTrackRestorer(): UseTrackRestorerResult {
   const { destination, getAccessToken } = useAuth()
-  const { importedBackup, playlistMap, setPlaylistMap } = useImportedBackup()
+  const { importedBackup, playlistMap, setPlaylistMap, setStatus: setContextStatus, addLog } = useImportedBackup()
 
   const [status,   setStatus]   = useState<RestorerStatus>('idle')
   const [progress, setProgress] = useState<TrackProgress | null>(null)
@@ -64,19 +64,27 @@ export function useTrackRestorer(): UseTrackRestorerResult {
   }, [setPlaylistMap])
 
   const startRestoring = useCallback(async () => {
+    addLog('Starting track restore...', 'info')
+
     if (!importedBackup) {
       setError('No backup loaded.')
       setStatus('error')
+      addLog('Error: No backup loaded', 'error')
+      setContextStatus('ERROR')
       return
     }
     if (!destination?.user) {
       setError('No destination account connected.')
       setStatus('error')
+      addLog('Error: No destination account connected', 'error')
+      setContextStatus('ERROR')
       return
     }
     if (!playlistMap || playlistMap.size === 0) {
       setError('No playlists have been created yet. Please complete Step 1 first.')
       setStatus('error')
+      addLog('Error: No playlists created yet', 'error')
+      setContextStatus('ERROR')
       return
     }
 
@@ -84,6 +92,8 @@ export function useTrackRestorer(): UseTrackRestorerResult {
     if (!token) {
       setError('Destination session expired. Please reconnect.')
       setStatus('error')
+      addLog('Error: Destination session expired', 'error')
+      setContextStatus('ERROR')
       return
     }
 
@@ -105,6 +115,7 @@ export function useTrackRestorer(): UseTrackRestorerResult {
     setStatus('restoring')
     setError(null)
     setResult(null)
+    addLog(`Adding ${tracksTotal} tracks to ${toProcess.length} playlists...`, 'info')
 
     let added                = 0
     let skippedLocal         = 0
@@ -122,6 +133,8 @@ export function useTrackRestorer(): UseTrackRestorerResult {
       if (meRes.status === 401) {
         setError('Destination session expired. Please click "↺ Force Reconnect" and try again.')
         setStatus('error')
+        addLog('Error: Session expired during restore', 'error')
+        setContextStatus('ERROR')
         return
       }
     } catch { /* Network error — continue */ }
@@ -150,6 +163,8 @@ export function useTrackRestorer(): UseTrackRestorerResult {
             `Track URI: ${testUri}.`
           )
           setStatus('error')
+          addLog(`Error: Failed to add test track`, 'error')
+          setContextStatus('ERROR')
           return
         }
         added += 1
@@ -185,6 +200,8 @@ export function useTrackRestorer(): UseTrackRestorerResult {
       }
 
       if (urisToAdd.length === 0) continue
+
+      addLog(`Adding tracks to "${pl.name}"...`, 'info')
 
       const batches = chunk(urisToAdd, BATCH_SIZE)
 
@@ -227,6 +244,8 @@ export function useTrackRestorer(): UseTrackRestorerResult {
               'at developer.spotify.com → your app → Settings.'
             )
             setStatus('error')
+            addLog('Error: Permission denied', 'error')
+            setContextStatus('ERROR')
             return
           }
 
@@ -251,13 +270,17 @@ export function useTrackRestorer(): UseTrackRestorerResult {
         if (bi < batches.length - 1) await delay(DELAY_BETWEEN_MS)
       }
 
+      addLog(`✓ Finished "${pl.name}"`, 'success')
+
       if (pi < toProcess.length - 1) await delay(DELAY_BETWEEN_MS)
     }
 
+    addLog(`✓ Track restore complete (${added} added, ${failed} failed)`, 'success')
     setResult({ added, skippedLocal, skippedEpisode, attemptedUnavailable, skippedNull, failed, skippedPlaylists, warnings })
     setStatus('done')
     setProgress(null)
-  }, [importedBackup, destination, getAccessToken, playlistMap])
+    setContextStatus('COMPLETE')
+  }, [importedBackup, destination, getAccessToken, playlistMap, setContextStatus, addLog])
 
   return { status, progress, result, error, startRestoring, reset }
 }

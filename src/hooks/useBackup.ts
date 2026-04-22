@@ -15,6 +15,7 @@
 
 import { useState, useCallback }   from 'react'
 import { useAuth }                 from './useAuth'
+import { useImportedBackup }       from '../context/BackupContext'
 import { fetchAllPlaylistTracks }  from '../lib/spotifyApi'
 import { buildBackup, downloadBackup } from '../lib/backupFormat'
 import type { PlaylistItem, SpotifyPlaylist } from '../lib/spotifyApi'
@@ -58,6 +59,7 @@ export interface UseBackupResult {
 
 export function useBackup(): UseBackupResult {
   const { source, getAccessToken } = useAuth()
+  const { setStatus: setContextStatus, addLog, clearLogs } = useImportedBackup()
 
   const [status,   setStatus]   = useState<BackupStatus>('idle')
   const [progress, setProgress] = useState<BackupProgress | null>(null)
@@ -69,15 +71,23 @@ export function useBackup(): UseBackupResult {
     setProgress(null)
     setResult(null)
     setError(null)
-  }, [])
+    setContextStatus('IDLE')
+    clearLogs()
+  }, [setContextStatus, clearLogs])
 
   const startBackup = useCallback(async (
     playlists:  SpotifyPlaylist[],
     likedSongs: SavedTrack[],
   ) => {
+    clearLogs()
+    setContextStatus('BACKING_UP')
+    addLog('Starting backup...', 'info')
+
     if (!source?.user) {
       setError('No source account connected.')
       setStatus('error')
+      setContextStatus('ERROR')
+      addLog('Error: No source account connected', 'error')
       return
     }
 
@@ -85,12 +95,15 @@ export function useBackup(): UseBackupResult {
     if (!token) {
       setError('Session expired. Please reconnect your source account.')
       setStatus('error')
+      setContextStatus('ERROR')
+      addLog('Error: Session expired', 'error')
       return
     }
 
     setStatus('fetching')
     setError(null)
     setResult(null)
+    addLog(`Fetching ${playlists.length} playlists...`, 'info')
 
     // Fetch tracks for every playlist — store results OR errors
     const playlistTracks = new Map<string, PlaylistItem[] | Error>()
@@ -106,20 +119,26 @@ export function useBackup(): UseBackupResult {
         tracksTotal:   pl.items?.total ?? 0,
       })
 
+      addLog(`Fetching "${pl.name}" (${pl.items?.total ?? 0} tracks)...`, 'info')
+
       try {
         const items = await fetchAllPlaylistTracks(token, pl.id, (fetched, total) => {
           setProgress(prev => prev ? { ...prev, tracksFetched: fetched, tracksTotal: total } : null)
         })
         playlistTracks.set(pl.id, items)
+        addLog(`✓ "${pl.name}" fetched`, 'success')
       } catch (err) {
         // Don't abort the whole backup — store the error and move on
+        const errorMsg = err instanceof Error ? err.message : String(err)
         playlistTracks.set(pl.id, err instanceof Error ? err : new Error(String(err)))
+        addLog(`✗ Failed to fetch "${pl.name}": ${errorMsg}`, 'error')
       }
     }
 
     // Build the JSON document
     setStatus('building')
     setProgress(null)
+    addLog('Building backup file...', 'info')
 
     const { backup, warnings } = buildBackup(
       source.user,
@@ -142,8 +161,10 @@ export function useBackup(): UseBackupResult {
       warnings,
     })
 
+    addLog(`✓ Backup complete! (${backup.stats.totalPlaylistTracks} tracks, ${backup.stats.totalLikedSongs} liked)`, 'success')
     setStatus('done')
-  }, [source, getAccessToken])
+    setContextStatus('COMPLETE')
+  }, [source, getAccessToken, setContextStatus, addLog, clearLogs])
 
   return { status, progress, result, error, startBackup, reset }
 }
