@@ -1,213 +1,221 @@
 /**
- * useLikedSongsRestorer — saves backup liked songs to the destination account.
- *
- * Milestone 12
- *
- * ── How liked songs differ from playlists ──────────────────
- *  • Liked songs live in the user's library, not in a playlist object.
- *  • Endpoint: PUT /me/library  (Spotify Feb 2026 — replaces PUT /me/tracks)
- *  • Accepts URIs (not IDs), max 50 per call (vs 100 for playlists).
- *  • Scope required: user-library-modify
- *  • No snapshot_id — success = HTTP 200 with empty body.
- *  • Order is NOT preserved — Spotify library always sorts by recently added.
- *  • Local files, episodes, null tracks are skipped (no URI).
- *
- * ── Batching ─────────────────────────────────────────────────
- *  Max 50 URIs per PUT /me/library call.
- *  300 ms polite delay between batches.
+ * useLikedSongsRestorer — saves backup liked songs to destination account.
+ * Uses PUT /me/library endpoint with max 50 URIs per call, 300ms delay between batches.
  */
 
-import { useState, useCallback }      from 'react'
-import { useAuth }                     from './useAuth'
-import { useImportedBackup }           from '../context/BackupContext'
-import { saveLikedSongs, chunk, delay } from '../lib/restoreApi'
+import { useState, useCallback } from "react";
+import { useAuth } from "./useAuth";
+import { useImportedBackup } from "../context/BackupContext";
+import { saveLikedSongs, chunk, delay } from "../lib/restoreApi";
 
-// ── Public types ──────────────────────────────────────────────
-
-export type LikedRestorerStatus = 'idle' | 'restoring' | 'done' | 'error'
+export type LikedRestorerStatus = "idle" | "restoring" | "done" | "error";
 
 export interface LikedProgress {
-  saved:   number   // running total saved so far
-  total:   number   // total restorable tracks
-  batch:   number   // current batch number (1-based)
-  batches: number   // total batches
+  saved: number;
+  total: number;
+  batch: number;
+  batches: number;
 }
-
 export interface LikedRestoreResult {
-  saved:          number   // successfully saved to library
-  skippedLocal:   number   // local files — no URI
-  skippedEpisode: number   // podcast episodes
-  skippedNull:    number   // deleted/null tracks
-  failed:         number   // rejected by Spotify even after retry
-  warnings:       string[]
+  saved: number;
+  skippedLocal: number;
+  skippedEpisode: number;
+  skippedNull: number;
+  failed: number;
+  warnings: string[];
 }
-
 export interface UseLikedSongsRestorerResult {
-  status:        LikedRestorerStatus
-  progress:      LikedProgress | null
-  result:        LikedRestoreResult | null
-  error:         string | null
-  startRestoring: () => Promise<void>
-  reset:         () => void
+  status: LikedRestorerStatus;
+  progress: LikedProgress | null;
+  result: LikedRestoreResult | null;
+  error: string | null;
+  startRestoring: () => Promise<void>;
+  reset: () => void;
 }
 
-// ── Constants ─────────────────────────────────────────────────
-const BATCH_SIZE       = 50    // Spotify hard limit for PUT /me/library
-const DELAY_BETWEEN_MS = 300
-
-// ─────────────────────────────────────────────────────────────
-// Hook
-// ─────────────────────────────────────────────────────────────
+const BATCH_SIZE = 50;
+const DELAY_BETWEEN_MS = 300;
 
 export function useLikedSongsRestorer(): UseLikedSongsRestorerResult {
-  const { destination, getAccessToken } = useAuth()
-  const { importedBackup, setStatus: setContextStatus, addLog } = useImportedBackup()
-
-  const [status,   setStatus]   = useState<LikedRestorerStatus>('idle')
-  const [progress, setProgress] = useState<LikedProgress | null>(null)
-  const [result,   setResult]   = useState<LikedRestoreResult | null>(null)
-  const [error,    setError]    = useState<string | null>(null)
+  const { destination, getAccessToken } = useAuth();
+  const {
+    importedBackup,
+    setStatus: setContextStatus,
+    addLog,
+  } = useImportedBackup();
+  const [status, setStatus] = useState<LikedRestorerStatus>("idle");
+  const [progress, setProgress] = useState<LikedProgress | null>(null);
+  const [result, setResult] = useState<LikedRestoreResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const reset = useCallback(() => {
-    setStatus('idle')
-    setProgress(null)
-    setResult(null)
-    setError(null)
-  }, [])
+    setStatus("idle");
+    setProgress(null);
+    setResult(null);
+    setError(null);
+  }, []);
 
   const startRestoring = useCallback(async () => {
-    addLog('Starting liked songs restore...', 'info')
+    addLog("Starting liked songs restore...", "info");
 
-    // ── Guard checks ──────────────────────────────────────────
     if (!importedBackup) {
-      setError('No backup loaded.')
-      setStatus('error')
-      addLog('Error: No backup loaded', 'error')
-      setContextStatus('ERROR')
-      return
+      setError("No backup loaded.");
+      setStatus("error");
+      addLog("Error: No backup loaded", "error");
+      setContextStatus("ERROR");
+      return;
     }
     if (!destination?.user) {
-      setError('No destination account connected.')
-      setStatus('error')
-      addLog('Error: No destination account connected', 'error')
-      setContextStatus('ERROR')
-      return
+      setError("No destination account connected.");
+      setStatus("error");
+      addLog("Error: No destination account connected", "error");
+      setContextStatus("ERROR");
+      return;
     }
 
-    const token = await getAccessToken('destination')
+    const token = await getAccessToken("destination");
     if (!token) {
-      setError('Destination session expired. Please reconnect.')
-      setStatus('error')
-      addLog('Error: Session expired', 'error')
-      setContextStatus('ERROR')
-      return
+      setError("Destination session expired. Please reconnect.");
+      setStatus("error");
+      addLog("Error: Session expired", "error");
+      setContextStatus("ERROR");
+      return;
     }
 
     // ── Collect restorable URIs ───────────────────────────────
     // Only 'track' kind items have a valid Spotify URI.
     // local / episode / null are skipped.
-    const urisToSave: string[] = []
-    let skippedLocal   = 0
-    let skippedEpisode = 0
-    let skippedNull    = 0
+    const urisToSave: string[] = [];
+    let skippedLocal = 0;
+    let skippedEpisode = 0;
+    let skippedNull = 0;
 
     for (const item of importedBackup.likedSongs.items) {
-      const t = item.track
-      if (!t || !t.uri) { skippedNull++;    continue }
-      if (t.isLocal)     { skippedLocal++;   continue }
+      const t = item.track;
+      if (!t || !t.uri) {
+        skippedNull++;
+        continue;
+      }
+      if (t.isLocal) {
+        skippedLocal++;
+        continue;
+      }
       // Episodes stored in liked songs (rare but possible)
-      if (t.uri.startsWith('spotify:episode:')) { skippedEpisode++; continue }
-      urisToSave.push(t.uri)
+      if (t.uri.startsWith("spotify:episode:")) {
+        skippedEpisode++;
+        continue;
+      }
+      urisToSave.push(t.uri);
     }
 
     if (urisToSave.length === 0) {
-      setResult({ saved: 0, skippedLocal, skippedEpisode, skippedNull, failed: 0, warnings: [] })
-      setStatus('done')
-      addLog('✓ No liked songs to restore', 'info')
-      setContextStatus('COMPLETE')
-      return
+      setResult({
+        saved: 0,
+        skippedLocal,
+        skippedEpisode,
+        skippedNull,
+        failed: 0,
+        warnings: [],
+      });
+      setStatus("done");
+      addLog("✓ No liked songs to restore", "info");
+      setContextStatus("COMPLETE");
+      return;
     }
 
-    const batches = chunk(urisToSave, BATCH_SIZE)
-    setStatus('restoring')
-    setError(null)
-    setResult(null)
-    addLog(`Saving ${urisToSave.length} liked songs...`, 'info')
+    const batches = chunk(urisToSave, BATCH_SIZE);
+    setStatus("restoring");
+    setError(null);
+    setResult(null);
+    addLog(`Saving ${urisToSave.length} liked songs...`, "info");
 
-    let saved    = 0
-    let failed   = 0
-    const warnings: string[] = []
+    let saved = 0;
+    let failed = 0;
+    const warnings: string[] = [];
 
     // ── Main loop — one batch at a time ───────────────────────
     for (let bi = 0; bi < batches.length; bi++) {
-      const batch = batches[bi]
+      const batch = batches[bi];
 
       setProgress({
         saved,
-        total:   urisToSave.length,
-        batch:   bi + 1,
+        total: urisToSave.length,
+        batch: bi + 1,
         batches: batches.length,
-      })
+      });
 
       try {
-        await saveLikedSongs(token, batch)
-        saved += batch.length
+        await saveLikedSongs(token, batch);
+        saved += batch.length;
         setProgress({
           saved,
-          total:   urisToSave.length,
-          batch:   bi + 1,
+          total: urisToSave.length,
+          batch: bi + 1,
           batches: batches.length,
-        })
+        });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
+        const msg = err instanceof Error ? err.message : String(err);
 
         // Hard stop on auth errors
-        if (msg.includes('save_liked_401')) {
-          setError('Session expired mid-restore. Please reconnect the destination account.')
-          setStatus('error')
-          addLog('Error: Session expired during restore', 'error')
-          setContextStatus('ERROR')
-          return
-        }
-        if (msg.includes('save_liked_403')) {
+        if (msg.includes("save_liked_401")) {
           setError(
-            'Spotify denied saving liked songs (403). ' +
-            'Please Force Reconnect the destination account and ensure you click "Agree" ' +
-            'on the Spotify permissions screen to grant library access.'
-          )
-          setStatus('error')
-          addLog('Error: Permission denied', 'error')
-          setContextStatus('ERROR')
-          return
+            "Session expired mid-restore. Please reconnect the destination account.",
+          );
+          setStatus("error");
+          addLog("Error: Session expired during restore", "error");
+          setContextStatus("ERROR");
+          return;
+        }
+        if (msg.includes("save_liked_403")) {
+          setError(
+            "Spotify denied saving liked songs (403). " +
+              'Please Force Reconnect the destination account and ensure you click "Agree" ' +
+              "on the Spotify permissions screen to grant library access.",
+          );
+          setStatus("error");
+          addLog("Error: Permission denied", "error");
+          setContextStatus("ERROR");
+          return;
         }
 
         // Batch failed — retry one by one
-        warnings.push(`Batch ${bi + 1} failed (${msg}) — retrying track by track…`)
+        warnings.push(
+          `Batch ${bi + 1} failed (${msg}) — retrying track by track…`,
+        );
         for (const uri of batch) {
           try {
-            await saveLikedSongs(token, [uri])
-            saved++
-            await delay(DELAY_BETWEEN_MS)
+            await saveLikedSongs(token, [uri]);
+            saved++;
+            await delay(DELAY_BETWEEN_MS);
           } catch {
-            failed++
-            warnings.push(`Could not save: ${uri}`)
+            failed++;
+            warnings.push(`Could not save: ${uri}`);
           }
         }
       }
 
       // Polite delay between batches
       if (bi < batches.length - 1) {
-        await delay(DELAY_BETWEEN_MS)
+        await delay(DELAY_BETWEEN_MS);
       }
     }
 
-    addLog(`✓ Liked songs restore complete (${saved} saved, ${failed} failed)`, 'success')
-    setResult({ saved, skippedLocal, skippedEpisode, skippedNull, failed, warnings })
-    setStatus('done')
-    setProgress(null)
-    setContextStatus('COMPLETE')
+    addLog(
+      `✓ Liked songs restore complete (${saved} saved, ${failed} failed)`,
+      "success",
+    );
+    setResult({
+      saved,
+      skippedLocal,
+      skippedEpisode,
+      skippedNull,
+      failed,
+      warnings,
+    });
+    setStatus("done");
+    setProgress(null);
+    setContextStatus("COMPLETE");
+  }, [importedBackup, destination, getAccessToken, setContextStatus, addLog]);
 
-  }, [importedBackup, destination, getAccessToken, setContextStatus, addLog])
-
-  return { status, progress, result, error, startRestoring, reset }
+  return { status, progress, result, error, startRestoring, reset };
 }

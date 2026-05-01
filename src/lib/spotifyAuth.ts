@@ -1,68 +1,42 @@
 /**
- * Spotify authorization helpers.
- *
- * Handles:
- *  - Building the /authorize URL (with PKCE params)
- *  - Exchanging auth code for tokens
- *  - Refreshing an expired access token
+ * Spotify authorization helpers: /authorize URL, token exchange, token refresh.
  */
 
 export type AccountRole = "source" | "destination";
-
-/** Shape of the state object we pass through the OAuth redirect */
 export interface OAuthState {
   role: AccountRole;
   nonce: string;
 }
-
-/** Shape of what Spotify returns from /api/token */
 export interface TokenResponse {
   access_token: string;
-  refresh_token: string; // May be absent on refresh — keep old one if so
-  expires_in: number; // Seconds until token expires (usually 3600)
+  refresh_token: string;
+  expires_in: number;
   token_type: string;
   scope: string;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Scopes requested from the user
-// Only request what you need — extra scopes make users nervous.
-// ─────────────────────────────────────────────────────────────
 export const SPOTIFY_SCOPES = [
-  // Who are you?
-  "user-read-private", // Profile name, country, product type (free/premium)
-  "user-read-email", // Email address — shown on account card
-
-  // Liked songs
-  "user-library-read", // Backup: read your saved tracks & albums
-  "user-library-modify", // Restore: save tracks & albums to library
-
-  // Playlists
-  "playlist-read-private", // Backup: read private playlists
-  "playlist-read-collaborative", // Backup: read playlists you collaborate on
-  "playlist-modify-public", // Restore: add tracks to / create public playlists
-  "playlist-modify-private", // Restore: add tracks to / create private playlists
-
-  // Followed artists & users
-  "user-follow-read", // Backup: read who you follow
-  "user-follow-modify", // Restore: re-follow artists
+  "user-read-private",
+  "user-read-email",
+  "user-library-read",
+  "user-library-modify",
+  "playlist-read-private",
+  "playlist-read-collaborative",
+  "playlist-modify-public",
+  "playlist-modify-private",
+  "user-follow-read",
+  "user-follow-modify",
 ];
 
 const AUTH_ENDPOINT = "https://accounts.spotify.com/authorize";
 const TOKEN_ENDPOINT = "https://accounts.spotify.com/api/token";
-
-// Pulled from .env at build time — never hard-code these
 const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID as string;
 const REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI as string;
 
-// ─────────────────────────────────────────────────────────────
-// Build the /authorize URL
-// ─────────────────────────────────────────────────────────────
 export function buildAuthUrl(codeChallenge: string, state: OAuthState): string {
-  // We JSON-stringify the state object so we can carry role + nonce together
   const stateString = JSON.stringify(state);
 
-  const params = new URLSearchParams({
+  return `${AUTH_ENDPOINT}?${new URLSearchParams({
     client_id: CLIENT_ID,
     response_type: "code",
     redirect_uri: REDIRECT_URI,
@@ -70,25 +44,16 @@ export function buildAuthUrl(codeChallenge: string, state: OAuthState): string {
     code_challenge: codeChallenge,
     state: stateString,
     scope: SPOTIFY_SCOPES.join(" "),
-    // show_dialog forces Spotify to show the account-picker every time.
-    // Critical for logging in with a DIFFERENT account for destination.
     show_dialog: "true",
-  });
-
-  return `${AUTH_ENDPOINT}?${params.toString()}`;
+  }).toString()}`;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Exchange auth code for tokens  (Step 3 of PKCE flow)
-// ─────────────────────────────────────────────────────────────
 export async function exchangeCodeForTokens(
   code: string,
   codeVerifier: string,
 ): Promise<TokenResponse> {
-  // Validate inputs
-  if (!code || !codeVerifier) {
+  if (!code || !codeVerifier)
     throw new Error("auth_pkce_failed: Missing code or code verifier");
-  }
 
   const response = await fetch(TOKEN_ENDPOINT, {
     method: "POST",
@@ -97,42 +62,34 @@ export async function exchangeCodeForTokens(
       client_id: CLIENT_ID,
       grant_type: "authorization_code",
       code,
-      redirect_uri: REDIRECT_URI, // Must EXACTLY match what was used in /authorize
-      code_verifier: codeVerifier, // Proves we started this flow (no client secret needed)
+      redirect_uri: REDIRECT_URI,
+      code_verifier: codeVerifier,
     }),
   });
 
   if (!response.ok) {
-    const errBody = await response.json().catch(() => ({}));
-    const spotifyError = (
-      errBody as { error?: string; error_description?: string }
-    ).error;
-    const spotifyDesc = (errBody as { error_description?: string })
-      .error_description;
-
-    // Map Spotify error codes to our internal codes
+    const err = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      error_description?: string;
+    };
     if (
-      spotifyError === "invalid_request" &&
-      spotifyDesc?.includes("redirect_uri")
-    ) {
+      err.error === "invalid_request" &&
+      err.error_description?.includes("redirect_uri")
+    )
       throw new Error(
-        "auth_redirect_uri_mismatch: redirect_uri does not match your Spotify app configuration",
+        "auth_redirect_uri_mismatch: redirect_uri does not match configuration",
       );
-    }
-    if (spotifyError === "invalid_grant") {
+    if (err.error === "invalid_grant")
       throw new Error(
-        "auth_token_exchange_failed: Authorization code has expired or was already used (code lasts 10 minutes)",
+        "auth_token_exchange_failed: Authorization code expired or reused (lasts 10 minutes)",
       );
-    }
-    if (spotifyError === "invalid_client") {
+    if (err.error === "invalid_client")
       throw new Error(
-        "auth_redirect_uri_mismatch: Client ID or redirect URI is incorrect",
+        "auth_redirect_uri_mismatch: Client ID or redirect URI incorrect",
       );
-    }
-
     throw new Error(
-      spotifyDesc
-        ? `auth_token_exchange_failed: ${spotifyDesc}`
+      err.error_description
+        ? `auth_token_exchange_failed: ${err.error_description}`
         : `auth_token_exchange_failed: HTTP ${response.status}`,
     );
   }
@@ -140,16 +97,11 @@ export async function exchangeCodeForTokens(
   return response.json() as Promise<TokenResponse>;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Refresh an expired access token using the refresh token
-// ─────────────────────────────────────────────────────────────
 export async function refreshAccessToken(
   refreshToken: string,
 ): Promise<TokenResponse> {
-  if (!refreshToken) {
+  if (!refreshToken)
     throw new Error("auth_pkce_failed: No refresh token available");
-  }
-
   const response = await fetch(TOKEN_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -161,23 +113,19 @@ export async function refreshAccessToken(
   });
 
   if (!response.ok) {
-    const errBody = await response.json().catch(() => ({}));
-    const spotifyError = (errBody as { error?: string }).error;
-    const spotifyDesc = (errBody as { error_description?: string })
-      .error_description;
-
-    if (spotifyError === "invalid_grant") {
+    const err = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      error_description?: string;
+    };
+    if (err.error === "invalid_grant")
       throw new Error(
-        "auth_token_refresh_failed: refresh token has expired or been revoked",
+        "auth_token_refresh_failed: refresh token expired or revoked",
       );
-    }
-
     throw new Error(
-      spotifyDesc
-        ? `auth_token_refresh_failed: ${spotifyDesc}`
+      err.error_description
+        ? `auth_token_refresh_failed: ${err.error_description}`
         : `auth_token_refresh_failed: HTTP ${response.status}`,
     );
   }
-
   return response.json() as Promise<TokenResponse>;
 }

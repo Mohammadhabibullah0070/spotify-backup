@@ -1,14 +1,6 @@
 /**
- * CallbackPage — rendered when Spotify redirects back to /callback.
- *
- * Steps:
- *  1. Read ?code and ?state from the URL
- *  2. Validate the nonce (CSRF check)
- *  3. Load the code verifier from sessionStorage
- *  4. Exchange the auth code for tokens
- *  5. Fetch the user's profile
- *  6. Save everything via AuthContext
- *  7. Redirect to /
+ * CallbackPage — renders when Spotify redirects to /callback.
+ * Validates nonce, exchanges code for tokens, fetches user profile, saves to context, redirects to /.
  */
 
 import { useEffect, useState } from "react";
@@ -28,6 +20,24 @@ import "./CallbackPage.css";
 
 type Status = "loading" | "error";
 
+const setError = (code: string, msg: string) => ({ code, msg });
+const handleError = (
+  error: string | boolean,
+  errorCode: string,
+  errorMsg: string,
+  setErrorCode: Function,
+  setErrorMsg: Function,
+  setStatus: Function,
+) => {
+  if (error) {
+    setErrorCode(errorCode);
+    setErrorMsg(errorMsg);
+    setStatus("error");
+    return true;
+  }
+  return false;
+};
+
 export default function CallbackPage() {
   const { setAccount } = useAuth();
   const [status, setStatus] = useState<Status>("loading");
@@ -38,9 +48,8 @@ export default function CallbackPage() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const stateRaw = params.get("state");
-    const error = params.get("error"); // e.g. 'access_denied'
+    const error = params.get("error");
 
-    // ── User denied access ─────────────────────────────────────
     if (error) {
       const parsed = parseErrorMessage(
         error === "access_denied"
@@ -57,7 +66,6 @@ export default function CallbackPage() {
       return;
     }
 
-    // ── Missing params ─────────────────────────────────────────
     if (!code || !stateRaw) {
       setErrorCode("auth_pkce_failed");
       setErrorMsg(
@@ -67,7 +75,6 @@ export default function CallbackPage() {
       return;
     }
 
-    // ── Parse state ────────────────────────────────────────────
     let oauthState: OAuthState;
     try {
       oauthState = JSON.parse(stateRaw) as OAuthState;
@@ -81,8 +88,6 @@ export default function CallbackPage() {
     }
 
     const { role, nonce } = oauthState;
-
-    // ── CSRF nonce check ───────────────────────────────────────
     const savedNonce = loadNonce(role);
     if (!savedNonce || savedNonce !== nonce) {
       setErrorCode("auth_pkce_failed");
@@ -93,7 +98,6 @@ export default function CallbackPage() {
       return;
     }
 
-    // ── Load code verifier ─────────────────────────────────────
     const codeVerifier = loadCodeVerifier(role);
     if (!codeVerifier) {
       setErrorCode("auth_pkce_failed");
@@ -104,28 +108,18 @@ export default function CallbackPage() {
       return;
     }
 
-    // ── Exchange code for tokens ────────────────────────────────
     (async () => {
       try {
         const tokenResponse = await exchangeCodeForTokens(code, codeVerifier);
-
         const tokens: StoredTokens = {
           accessToken: tokenResponse.access_token,
           refreshToken: tokenResponse.refresh_token,
           expiresAt: Date.now() + tokenResponse.expires_in * 1000,
         };
-
-        // Fetch the user's Spotify profile
         const user = await fetchCurrentUser(tokenResponse.access_token);
-
-        // Save to context + localStorage
         setAccount(role, tokens, user);
-
-        // Clean up session storage (these are single-use)
         clearCodeVerifier(role);
         clearNonce(role);
-
-        // Redirect to home
         window.location.href = "/";
       } catch (err) {
         const parsed = parseErrorMessage(err);
@@ -138,7 +132,6 @@ export default function CallbackPage() {
     })();
   }, [setAccount]);
 
-  // ── Render ──────────────────────────────────────────────────
   if (status === "loading") {
     return (
       <div className="callback-page">

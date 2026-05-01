@@ -1,49 +1,32 @@
 /**
  * PKCE (Proof Key for Code Exchange) helpers.
- *
- * PKCE stops a malicious app from stealing your auth code.
- * You generate a random "verifier", hash it into a "challenge",
- * send the challenge to Spotify, then prove ownership later
- * by sending the original verifier when swapping code for tokens.
+ * PKCE prevents malicious apps from stealing auth codes.
  */
 
-/**
- * Generates a random code verifier string.
- * Must be 43–128 characters (RFC 7636).
- */
+/** Generates a random code verifier string (43-128 characters per RFC 7636). */
 export function generateCodeVerifier(length = 128): string {
   const chars =
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'
-  const bytes = crypto.getRandomValues(new Uint8Array(length))
-  return Array.from(bytes)
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+  return Array.from(crypto.getRandomValues(new Uint8Array(length)))
     .map((b) => chars[b % chars.length])
-    .join('')
+    .join("");
 }
 
-/**
- * Hashes the verifier with SHA-256 and returns a Base64URL-encoded string.
- * This is what gets sent to Spotify as code_challenge.
- */
+/** Hashes verifier with SHA-256 and returns Base64URL-encoded challenge. */
 export async function generateCodeChallenge(verifier: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(verifier)
-  const digest = await crypto.subtle.digest('SHA-256', data)
-
-  // Convert ArrayBuffer → Base64 → Base64URL
+  const data = new TextEncoder().encode(verifier);
+  const digest = await crypto.subtle.digest("SHA-256", data);
   return btoa(String.fromCharCode(...new Uint8Array(digest)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
-/**
- * Generates a short random string used as an OAuth state nonce.
- * Used to detect CSRF attacks on the callback.
- */
+/** Generates a random CSRF state nonce (16 characters). */
 export function generateNonce(length = 16): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  const bytes = crypto.getRandomValues(new Uint8Array(length))
-  return Array.from(bytes)
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  return Array.from(crypto.getRandomValues(new Uint8Array(length)))
     .map((b) => chars[b % chars.length])
-    .join('')
+    .join("");
 }

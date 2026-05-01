@@ -3,23 +3,18 @@
  * Every function takes an access token and returns typed data.
  */
 
-// ─── Shared types ─────────────────────────────────────────────
-
 export interface SpotifyImage {
   url: string;
   width: number | null;
   height: number | null;
 }
-
 export interface SpotifyFollowers {
   total: number;
 }
-
 export interface SpotifyExternalUrls {
   spotify: string;
 }
 
-// Generic paginated response wrapper used by all list endpoints
 export interface SpotifyPage<T> {
   items: T[];
   total: number;
@@ -29,8 +24,6 @@ export interface SpotifyPage<T> {
   previous: string | null;
   href: string;
 }
-
-// ─── User ─────────────────────────────────────────────────────
 
 export interface SpotifyUser {
   id: string;
@@ -43,8 +36,6 @@ export interface SpotifyUser {
   external_urls: SpotifyExternalUrls;
 }
 
-// ─── Playlist types ───────────────────────────────────────────
-
 export interface SpotifyPlaylistOwner {
   id: string;
   display_name: string | null;
@@ -52,7 +43,6 @@ export interface SpotifyPlaylistOwner {
   type: string;
 }
 
-// Renamed from TracksRef → ItemsRef in the February 2026 API update
 export interface SpotifyPlaylistItemsRef {
   href: string;
   total: number;
@@ -65,20 +55,17 @@ export interface SpotifyPlaylist {
   owner: SpotifyPlaylistOwner;
   public: boolean | null;
   collaborative: boolean;
-  items?: SpotifyPlaylistItemsRef; // absent for playlists you follow but don't own
+  items?: SpotifyPlaylistItemsRef;
   images: SpotifyImage[];
   snapshot_id: string;
   external_urls: SpotifyExternalUrls;
 }
-
-// ─── Track / Episode types (used inside playlist items) ───────
 
 export interface SpotifyArtist {
   id: string;
   name: string;
   external_urls: SpotifyExternalUrls;
 }
-
 export interface SpotifyAlbum {
   id: string;
   name: string;
@@ -86,44 +73,22 @@ export interface SpotifyAlbum {
   external_urls: SpotifyExternalUrls;
 }
 
-/**
- * A normal Spotify track OR a local file track.
- *
- * Local files have:
- *   is_local   = true
- *   id         = null
- *   uri        = "spotify:local:Artist:Album:TrackName:duration_seconds"
- *   is_playable = undefined / not set
- *
- * Unavailable tracks (geo-restricted) have:
- *   is_playable = false
- *   linked_from = the original URI that should be used for restore
- */
 export interface SpotifyTrack {
   type: "track";
-  id: string | null; // null for local files
+  id: string | null;
   name: string;
   uri: string;
   is_local: boolean;
-  is_playable?: boolean; // absent = assume playable; false = blocked in user's region
+  is_playable?: boolean;
   duration_ms: number;
   explicit: boolean;
   artists: SpotifyArtist[];
   album: SpotifyAlbum;
-  linked_from?: {
-    // Present when track was relinked due to regional restriction
-    uri: string;
-    id: string;
-  };
+  linked_from?: { uri: string; id: string };
   external_ids?: { isrc?: string };
   external_urls: SpotifyExternalUrls;
 }
 
-/**
- * A podcast episode (can appear in playlists in some regions).
- * We display these but skip them during restore — they cannot be added
- * to music playlists via the API.
- */
 export interface SpotifyEpisode {
   type: "episode";
   id: string;
@@ -131,43 +96,19 @@ export interface SpotifyEpisode {
   uri: string;
   duration_ms: number;
   description: string;
-  show: {
-    id: string;
-    name: string;
-  };
+  show: { id: string; name: string };
   external_urls: SpotifyExternalUrls;
 }
 
-/**
- * One item in a playlist — wraps either a track or an episode.
- *
- * February 2026 API change: the field was renamed from 'track' to 'item'.
- *
- * item can be:
- *   SpotifyTrack   — normal track or local file
- *   SpotifyEpisode — podcast episode
- *   null           — track was deleted or is completely unavailable
- */
 export interface PlaylistItem {
   added_at: string | null;
   added_by: { id: string } | null;
-  is_local: boolean; // true when this item is a local file
-  item: SpotifyTrack | SpotifyEpisode | null; // renamed from 'track' in Feb 2026
+  is_local: boolean;
+  item: SpotifyTrack | SpotifyEpisode | null;
 }
 
-/**
- * Classified kind for a playlist item — used by TrackList to decide
- * how to render and what label/badge to show.
- *
- *  'track'       → normal Spotify track, fully restorable
- *  'local'       → local file, display-only — CANNOT be restored via API
- *  'episode'     → podcast episode — skipped during restore
- *  'unavailable' → geo-restricted track — try linked_from.uri during restore
- *  'null'        → deleted / totally unavailable — skip during restore
- */
 export type TrackKind = "track" | "local" | "episode" | "unavailable" | "null";
 
-/** Classify a PlaylistItem into one of the TrackKind values */
 export function classifyItem(playlistItem: PlaylistItem): TrackKind {
   if (!playlistItem.item) return "null";
   if (playlistItem.is_local) return "local";
@@ -178,7 +119,6 @@ export function classifyItem(playlistItem: PlaylistItem): TrackKind {
   return "track";
 }
 
-/** Format duration from milliseconds to m:ss */
 export function formatDuration(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
@@ -186,19 +126,13 @@ export function formatDuration(ms: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-// ─── Fetch helpers ────────────────────────────────────────────
-
 const BASE = "https://api.spotify.com/v1";
-
-function authHeader(token: string): HeadersInit {
-  return { Authorization: `Bearer ${token}` };
-}
-
+const authHeader = (token: string): HeadersInit => ({
+  Authorization: `Bearer ${token}`,
+});
 let spotifyReadBlockedUntil = 0;
-
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+const wait = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 async function spotifyReadFetch(
   url: string,
@@ -206,31 +140,21 @@ async function spotifyReadFetch(
   maxRetries: number = 2,
 ): Promise<Response> {
   let attempt = 0;
-
   while (attempt <= maxRetries) {
     const now = Date.now();
-    if (spotifyReadBlockedUntil > now) {
+    if (spotifyReadBlockedUntil > now)
       await wait(spotifyReadBlockedUntil - now);
-    }
-
     const res = await fetch(url, { headers: authHeader(accessToken) });
     if (res.status !== 429) return res;
-
     const retryAfter = Number(res.headers.get("Retry-After") ?? "5");
     spotifyReadBlockedUntil = Date.now() + (retryAfter + 1) * 1000;
-
-    if (attempt === maxRetries) {
+    if (attempt === maxRetries)
       throw new Error(`spotify_read_429:${retryAfter}`);
-    }
-
     await wait((retryAfter + 1) * 1000);
     attempt += 1;
   }
-
   throw new Error("spotify_read_429");
 }
-
-// ─── User profile ─────────────────────────────────────────────
 
 export async function fetchCurrentUser(
   accessToken: string,
